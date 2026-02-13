@@ -5,7 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'my-cloud-storage-app/**' # Only trigger if the app changes
+      - 'my-cloud-storage-app/**'
+      - '.github/workflows/deploy.yml'
 
 permissions:
   id-token: write
