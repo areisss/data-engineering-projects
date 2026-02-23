@@ -8,7 +8,6 @@ export default function App() {
   const [tier, setTier] = useState('Standard'); // Default to Standard
   const [uploadStatus, setUploadStatus] = useState('');
 
-  // The function to handle the upload
   const handleUpload = async () => {
     if (!file) {
       alert("Please select a file first!");
