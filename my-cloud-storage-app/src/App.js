@@ -17,11 +17,15 @@ export default function App() {
 
     try {
       setUploadStatus("Uploading...");
-      
+
       // We add the 'tier' as Metadata. 
       // Later, we will tell S3 to look for this metadata to move the file.
+      const isPhoto = file.type.startsWith('image/');
+      const folder = isPhoto ? 'raw-photos' : 'raw-whatsapp-uploads';
+      const customKey = `${folder}/${file.name}`;
+
       const result = await uploadData({
-        key: file.name,
+        key: customKey,
         data: file,
         options: {
           metadata: {
@@ -44,14 +48,14 @@ export default function App() {
       {({ signOut, user }) => (
         <main style={styles.container}>
           <h1>Welcome, {user.username}</h1>
-          
+
           {/* File Upload Section */}
           <div style={styles.uploadBox}>
             <h2>Upload a File</h2>
-            
-            <input 
-              type="file" 
-              onChange={(e) => setFile(e.target.files[0])} 
+
+            <input
+              type="file"
+              onChange={(e) => setFile(e.target.files[0])}
               style={styles.input}
             />
 
@@ -67,7 +71,7 @@ export default function App() {
             <button onClick={handleUpload} style={styles.button}>
               Upload to Cloud
             </button>
-            
+
             {uploadStatus && <p style={styles.status}>{uploadStatus}</p>}
           </div>
 
