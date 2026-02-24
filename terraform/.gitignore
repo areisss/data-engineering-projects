@@ -1,5 +1,7 @@
 .terraform/
 lambdas/**/*.zip
+lambdas/**/__pycache__/
+lambdas/**/*.pyc
 *.tfstate
 *.tfstate.backup
 *.tfvars
