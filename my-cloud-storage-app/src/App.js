@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Authenticator } from '@aws-amplify/ui-react';
-import { uploadData } from 'aws-amplify/storage'; // New v6 import
+import { uploadData } from 'aws-amplify/storage';
 import '@aws-amplify/ui-react/styles.css';
 
 export default function App() {
   const [file, setFile] = useState(null);
-  const [tier, setTier] = useState('Standard'); // Default to Standard
+  const [tier, setTier] = useState('Standard');
   const [uploadStatus, setUploadStatus] = useState('');
 
   const handleUpload = async () => {
@@ -17,30 +17,41 @@ export default function App() {
     try {
       setUploadStatus("Uploading...");
 
-      // We add the 'tier' as Metadata. 
-      // Later, we will tell S3 to look for this metadata to move the file.
-      const isPhoto = file.type.startsWith('image/');
-      const folder = isPhoto ? 'raw-photos' : 'raw-whatsapp-uploads';
-      const customKey = `${folder}/${file.name}`;
+      const fileName = file.name;
+      const extension = fileName.split('.').pop().toLowerCase();
 
+      // 1. Logic to determine the S3 path
+      let storagePath = `public/misc/${fileName}`;
+
+      if (extension === 'zip') {
+        storagePath = `public/uploads-landing/${fileName}`;
+      } else if (extension === 'txt') {
+        storagePath = `public/raw-whatsapp-uploads/${fileName}`;
+      } else if (['jpg', 'jpeg', 'png', 'webp'].includes(extension)) {
+        storagePath = `public/raw-photos/${fileName}`;
+      }
+
+      // 2. The S3 Upload with Metadata
       const result = await uploadData({
-        key: customKey,
+        key: storagePath,
         data: file,
         options: {
+          contentType: file.type,
           metadata: {
-            tier: tier // This adds x-amz-meta-tier: "DeepArchive" to the file
+            tier: tier
           }
         }
       }).result;
 
-      console.log("Success:", result);
-      setUploadStatus(`Success! Uploaded to ${tier} tier.`);
-      setFile(null); // Reset file input
+      console.log('File successfully uploaded to:', result.key);
+      setUploadStatus("Upload successful!");
+      alert("Upload successful!");
+
     } catch (error) {
-      console.error("Error uploading file:", error);
-      setUploadStatus("Error uploading file. Check console.");
+      console.error('Error uploading file:', error);
+      setUploadStatus("Upload failed. Check console.");
     }
-  };
+  }; // End of handleUpload
 
   return (
     <Authenticator>
@@ -48,7 +59,6 @@ export default function App() {
         <main style={styles.container}>
           <h1>Welcome, {user.username}</h1>
 
-          {/* File Upload Section */}
           <div style={styles.uploadBox}>
             <h2>Upload a File</h2>
 
@@ -79,9 +89,8 @@ export default function App() {
       )}
     </Authenticator>
   );
-}
+} // End of App Component
 
-// Simple CSS Styles to make it look decent
 const styles = {
   container: { width: '400px', margin: '50px auto', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
   uploadBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px' },
