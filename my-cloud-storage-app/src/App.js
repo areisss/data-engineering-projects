@@ -7,6 +7,24 @@ export default function App() {
   const [file, setFile] = useState(null);
   const [tier, setTier] = useState('Standard');
   const [uploadStatus, setUploadStatus] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped) setFile(dropped);
+  };
 
   const handleUpload = async () => {
     if (!file) {
@@ -63,11 +81,19 @@ export default function App() {
           <div style={styles.uploadBox}>
             <h2>Upload a File</h2>
 
-            <input
-              type="file"
-              onChange={(e) => setFile(e.target.files[0])}
-              style={styles.input}
-            />
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              style={{ ...styles.dropZone, ...(isDragging ? styles.dropZoneActive : {}) }}
+            >
+              {file ? file.name : 'Drag & drop a file here, or click to select'}
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files[0])}
+                style={styles.fileInput}
+              />
+            </div>
 
             <div style={styles.tierSelector}>
               <label>Choose Cost Tier: </label>
@@ -95,7 +121,9 @@ export default function App() {
 const styles = {
   container: { width: '400px', margin: '50px auto', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
   uploadBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px' },
-  input: { marginBottom: '15px', display: 'block', width: '100%' },
+  dropZone: { position: 'relative', border: '2px dashed #aaa', borderRadius: '6px', padding: '20px', marginBottom: '15px', color: '#666', cursor: 'pointer', transition: 'border-color 0.2s, background 0.2s' },
+  dropZoneActive: { borderColor: '#0073e6', background: '#e8f3ff', color: '#0073e6' },
+  fileInput: { position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' },
   tierSelector: { marginBottom: '15px', textAlign: 'left' },
   select: { marginLeft: '10px', padding: '5px' },
   button: { backgroundColor: '#0073e6', color: 'white', padding: '10px 20px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px' },
