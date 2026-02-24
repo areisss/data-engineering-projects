@@ -8,6 +8,7 @@ export default function App() {
   const [tier, setTier] = useState('Standard');
   const [uploadStatus, setUploadStatus] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [progress, setProgress] = useState(null);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -34,6 +35,7 @@ export default function App() {
 
     try {
       setUploadStatus("Uploading...");
+      setProgress(0);
 
       const fileName = file.name;
       const extension = fileName.split('.').pop().toLowerCase();
@@ -56,18 +58,23 @@ export default function App() {
         data: file,
         options: {
           contentType: file.type,
-          metadata: {
-            tier: tier
+          metadata: { tier: tier },
+          onProgress: ({ transferredBytes, totalBytes }) => {
+            if (totalBytes) {
+              setProgress(Math.round((transferredBytes / totalBytes) * 100));
+            }
           }
         }
       }).result;
 
       console.log('File successfully uploaded to:', result.key);
+      setProgress(null);
       setUploadStatus("Upload successful!");
       alert("Upload successful!");
 
     } catch (error) {
       console.error('Error uploading file:', error);
+      setProgress(null);
       setUploadStatus("Upload failed. Check console.");
     }
   }; // End of handleUpload
@@ -108,6 +115,13 @@ export default function App() {
               Upload to Cloud
             </button>
 
+            {progress !== null && (
+              <div style={styles.progressTrack}>
+                <div style={{ ...styles.progressBar, width: `${progress}%` }} />
+                <span style={styles.progressLabel}>{progress}%</span>
+              </div>
+            )}
+
             {uploadStatus && <p style={styles.status}>{uploadStatus}</p>}
           </div>
 
@@ -128,5 +142,8 @@ const styles = {
   select: { marginLeft: '10px', padding: '5px' },
   button: { backgroundColor: '#0073e6', color: 'white', padding: '10px 20px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px' },
   signOutBtn: { backgroundColor: '#f0f0f0', border: '1px solid #ccc', padding: '8px 16px', cursor: 'pointer' },
+  progressTrack: { position: 'relative', background: '#e0e0e0', borderRadius: '4px', height: '20px', marginTop: '15px', overflow: 'hidden' },
+  progressBar: { height: '100%', background: '#0073e6', borderRadius: '4px', transition: 'width 0.2s ease' },
+  progressLabel: { position: 'absolute', top: 0, left: 0, right: 0, lineHeight: '20px', fontSize: '12px', fontWeight: 'bold', color: 'white', textAlign: 'center' },
   status: { marginTop: '10px', fontWeight: 'bold', color: 'green' }
 };
