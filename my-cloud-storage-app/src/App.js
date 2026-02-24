@@ -29,6 +29,7 @@ export default function App() {
   useEffect(() => { fetchFiles(); }, []);
 
   const handleDelete = async (key) => {
+    if (!window.confirm(`Delete "${key}"?`)) return;
     try {
       await remove({ key });
       fetchFiles();

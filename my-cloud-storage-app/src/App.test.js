@@ -27,7 +27,8 @@ test('renders uploaded files section', () => {
   expect(screen.getByText(/no files uploaded yet/i)).toBeInTheDocument();
 });
 
-test('delete button calls remove with the file key', async () => {
+test('delete button calls remove after confirmation', async () => {
+  window.confirm = jest.fn().mockReturnValue(true);
   const { list } = require('aws-amplify/storage');
   list.mockResolvedValueOnce({
     items: [{ key: 'misc/test.pdf', size: 1024, lastModified: new Date() }],
@@ -39,6 +40,23 @@ test('delete button calls remove with the file key', async () => {
   fireEvent.click(deleteBtn);
 
   await waitFor(() => {
+    expect(window.confirm).toHaveBeenCalledWith('Delete "misc/test.pdf"?');
     expect(mockRemove).toHaveBeenCalledWith({ key: 'misc/test.pdf' });
   });
+});
+
+test('delete button does not remove when confirmation is cancelled', async () => {
+  window.confirm = jest.fn().mockReturnValue(false);
+  const { list } = require('aws-amplify/storage');
+  list.mockResolvedValueOnce({
+    items: [{ key: 'misc/test.pdf', size: 1024, lastModified: new Date() }],
+  });
+
+  render(<App />);
+
+  const deleteBtn = await screen.findByText(/delete/i);
+  fireEvent.click(deleteBtn);
+
+  expect(window.confirm).toHaveBeenCalled();
+  expect(mockRemove).not.toHaveBeenCalled();
 });
