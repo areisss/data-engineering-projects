@@ -2,6 +2,8 @@
 lambdas/**/*.zip
 lambdas/**/__pycache__/
 lambdas/**/*.pyc
+glue_jobs/**/__pycache__/
+glue_jobs/**/*.pyc
 *.tfstate
 *.tfstate.backup
 *.tfvars

@@ -17,3 +17,8 @@ output "lambda_role_arn" {
   description = "IAM role ARN for Lambda functions"
   value       = module.compute.lambda_role_arn
 }
+
+output "glue_job_name" {
+  description = "Glue job name for the WhatsApp silver transformation"
+  value       = module.analytics.glue_job_name
+}
