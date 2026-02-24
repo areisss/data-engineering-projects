@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Authenticator } from '@aws-amplify/ui-react';
-import { uploadData, list } from 'aws-amplify/storage';
+import { uploadData, list, remove } from 'aws-amplify/storage';
 import '@aws-amplify/ui-react/styles.css';
 
 function formatBytes(bytes) {
@@ -27,6 +27,15 @@ export default function App() {
   };
 
   useEffect(() => { fetchFiles(); }, []);
+
+  const handleDelete = async (key) => {
+    try {
+      await remove({ key });
+      fetchFiles();
+    } catch (error) {
+      console.error('Error deleting file:', error);
+    }
+  };
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -154,6 +163,7 @@ export default function App() {
                     <th style={styles.th}>File</th>
                     <th style={styles.th}>Size</th>
                     <th style={styles.th}>Date</th>
+                    <th style={styles.th}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -162,6 +172,9 @@ export default function App() {
                       <td style={styles.td}>{item.key}</td>
                       <td style={styles.td}>{formatBytes(item.size)}</td>
                       <td style={styles.td}>{item.lastModified?.toLocaleDateString()}</td>
+                      <td style={styles.td}>
+                        <button onClick={() => handleDelete(item.key)} style={styles.deleteBtn}>Delete</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -193,5 +206,6 @@ const styles = {
   fileListBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px', textAlign: 'left' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
   th: { borderBottom: '2px solid #ddd', padding: '8px', textAlign: 'left', color: '#555' },
-  td: { borderBottom: '1px solid #f0f0f0', padding: '8px', wordBreak: 'break-all' }
+  td: { borderBottom: '1px solid #f0f0f0', padding: '8px', wordBreak: 'break-all' },
+  deleteBtn: { backgroundColor: '#ff4d4d', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px' }
 };
