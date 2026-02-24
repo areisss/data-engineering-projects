@@ -60,6 +60,34 @@ resource "aws_iam_role_policy_attachment" "lambda_s3_dynamodb" {
   policy_arn = aws_iam_policy.lambda_s3_dynamodb.arn
 }
 
-# Lambda function resources are added in:
-#   Step 3 — bronze ingestion (whatsapp)
-#   Step 5 — photo processing
+data "archive_file" "whatsapp_bronze" {
+  type        = "zip"
+  source_file = "${path.root}/lambdas/whatsapp_bronze/handler.py"
+  output_path = "${path.root}/lambdas/whatsapp_bronze/handler.zip"
+}
+
+resource "aws_lambda_function" "whatsapp_bronze" {
+  filename         = data.archive_file.whatsapp_bronze.output_path
+  function_name    = "${var.project_name}-whatsapp-bronze-${var.environment}"
+  role             = aws_iam_role.lambda.arn
+  handler          = "handler.handler"
+  runtime          = "python3.12"
+  source_code_hash = data.archive_file.whatsapp_bronze.output_base64sha256
+  timeout          = 60
+  memory_size      = 256
+
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_lambda_permission" "s3_invoke_whatsapp_bronze" {
+  statement_id  = "AllowS3InvokeWhatsappBronze"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.whatsapp_bronze.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = var.bucket_arn
+}
+
+# Photo processing Lambda is added in Step 5.

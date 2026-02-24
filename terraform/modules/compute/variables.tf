@@ -13,3 +13,7 @@ variable "bucket_arn" {
 variable "dynamodb_arn" {
   description = "ARN of the DynamoDB PhotoMetadata table"
 }
+
+variable "bucket_id" {
+  description = "S3 bucket name (used for S3 notification filter)"
+}

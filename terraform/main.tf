@@ -13,8 +13,24 @@ module "compute" {
   source       = "./modules/compute"
   project_name = var.project_name
   environment  = var.environment
+  bucket_id    = module.storage.bucket_id
   bucket_arn   = module.storage.bucket_arn
   dynamodb_arn = module.storage.photo_metadata_table_arn
+}
+
+# S3 bucket notifications are managed here (root module) to avoid conflicts
+# when multiple Lambdas need triggers on the same bucket (added in steps 3 & 5).
+resource "aws_s3_bucket_notification" "main" {
+  bucket = module.storage.bucket_id
+
+  lambda_function {
+    lambda_function_arn = module.compute.whatsapp_bronze_lambda_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "raw-whatsapp-uploads/"
+    filter_suffix       = ".txt"
+  }
+
+  depends_on = [module.compute]
 }
 
 module "analytics" {
