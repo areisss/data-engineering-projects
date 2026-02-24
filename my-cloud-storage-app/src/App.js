@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Authenticator } from '@aws-amplify/ui-react';
 import { uploadData, list, remove } from 'aws-amplify/storage';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import '@aws-amplify/ui-react/styles.css';
 
 function formatBytes(bytes) {
@@ -16,6 +17,8 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [photos, setPhotos] = useState([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
 
   const fetchFiles = async () => {
     try {
@@ -26,7 +29,26 @@ export default function App() {
     }
   };
 
-  useEffect(() => { fetchFiles(); }, []);
+  const fetchPhotos = async () => {
+    const apiUrl = process.env.REACT_APP_PHOTOS_API_URL;
+    if (!apiUrl) return;
+    setPhotosLoading(true);
+    try {
+      const session = await fetchAuthSession();
+      const token = session.tokens?.idToken?.toString();
+      const res = await fetch(apiUrl, { headers: { Authorization: token } });
+      setPhotos(await res.json());
+    } catch (err) {
+      console.error('Error fetching photos:', err);
+    } finally {
+      setPhotosLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFiles();
+    fetchPhotos();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (key) => {
     if (!window.confirm(`Delete "${key}"?`)) return;
@@ -68,8 +90,6 @@ export default function App() {
       const fileName = file.name;
       const extension = fileName.split('.').pop().toLowerCase();
 
-      // 1. Logic to determine the S3 path
-      // Remove "public/" from the strings below
       let storagePath = `misc/${fileName}`;
 
       if (extension === 'zip') {
@@ -80,7 +100,6 @@ export default function App() {
         storagePath = `raw-photos/${fileName}`;
       }
 
-      // 2. The S3 Upload with Metadata
       const result = await uploadData({
         key: storagePath,
         data: file,
@@ -105,7 +124,7 @@ export default function App() {
       setProgress(null);
       setUploadStatus("Upload failed. Check console.");
     }
-  }; // End of handleUpload
+  };
 
   return (
     <Authenticator>
@@ -153,6 +172,48 @@ export default function App() {
             {uploadStatus && <p style={styles.status}>{uploadStatus}</p>}
           </div>
 
+          <div style={styles.galleryBox}>
+            <div style={styles.galleryHeader}>
+              <h2 style={{ margin: 0 }}>Photo Gallery</h2>
+              <button onClick={fetchPhotos} style={styles.refreshBtn} disabled={photosLoading}>
+                {photosLoading ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
+            {photosLoading ? (
+              <p style={{ color: '#999' }}>Loading photos...</p>
+            ) : photos.length === 0 ? (
+              <p style={{ color: '#999' }}>No photos yet. Upload an image to get started.</p>
+            ) : (
+              <div style={styles.galleryGrid}>
+                {photos.map((photo) => (
+                  <div key={photo.photo_id} style={styles.photoCard}>
+                    <img
+                      src={photo.thumbnail_url}
+                      alt={photo.filename}
+                      style={styles.photoThumb}
+                    />
+                    <div style={styles.photoInfo}>
+                      <div style={styles.photoName} title={photo.filename}>{photo.filename}</div>
+                      <div style={styles.photoDims}>{photo.width} &times; {photo.height}</div>
+                      <div style={styles.photoDate}>
+                        {new Date(photo.uploaded_at).toLocaleDateString()}
+                      </div>
+                      <a
+                        href={photo.original_url}
+                        download={photo.filename}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={styles.downloadLink}
+                      >
+                        Download
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div style={styles.fileListBox}>
             <h2>Uploaded Files</h2>
             {uploadedFiles.length === 0 ? (
@@ -188,10 +249,10 @@ export default function App() {
       )}
     </Authenticator>
   );
-} // End of App Component
+}
 
 const styles = {
-  container: { width: '650px', margin: '50px auto', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
+  container: { width: '700px', margin: '50px auto', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
   uploadBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px' },
   dropZone: { position: 'relative', border: '2px dashed #aaa', borderRadius: '6px', padding: '20px', marginBottom: '15px', color: '#666', cursor: 'pointer', transition: 'border-color 0.2s, background 0.2s' },
   dropZoneActive: { borderColor: '#0073e6', background: '#e8f3ff', color: '#0073e6' },
@@ -204,9 +265,20 @@ const styles = {
   progressBar: { height: '100%', background: '#0073e6', borderRadius: '4px', transition: 'width 0.2s ease' },
   progressLabel: { position: 'absolute', top: 0, left: 0, right: 0, lineHeight: '20px', fontSize: '12px', fontWeight: 'bold', color: 'white', textAlign: 'center' },
   status: { marginTop: '10px', fontWeight: 'bold', color: 'green' },
+  galleryBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px', textAlign: 'left' },
+  galleryHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
+  refreshBtn: { backgroundColor: '#f0f0f0', border: '1px solid #ccc', borderRadius: '4px', padding: '4px 12px', cursor: 'pointer', fontSize: '13px' },
+  galleryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '16px' },
+  photoCard: { border: '1px solid #e8e8e8', borderRadius: '6px', overflow: 'hidden' },
+  photoThumb: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', background: '#f5f5f5' },
+  photoInfo: { padding: '8px', fontSize: '12px', textAlign: 'center' },
+  photoName: { fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' },
+  photoDims: { color: '#888', marginBottom: '2px' },
+  photoDate: { color: '#888', marginBottom: '6px' },
+  downloadLink: { display: 'inline-block', padding: '4px 10px', backgroundColor: '#0073e6', color: 'white', borderRadius: '4px', textDecoration: 'none', fontSize: '11px' },
   fileListBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px', textAlign: 'left' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
   th: { borderBottom: '2px solid #ddd', padding: '8px', textAlign: 'left', color: '#555' },
   td: { borderBottom: '1px solid #f0f0f0', padding: '8px', wordBreak: 'break-all' },
-  deleteBtn: { backgroundColor: '#ff4d4d', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px' }
+  deleteBtn: { backgroundColor: '#ff4d4d', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px' },
 };

@@ -48,6 +48,8 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Build Project
+        env:
+          REACT_APP_PHOTOS_API_URL: ${{ secrets.PHOTOS_API_URL }}
         run: npm run build
 
       # 5. Secure Login to AWS
