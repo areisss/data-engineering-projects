@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Authenticator } from '@aws-amplify/ui-react';
-import { uploadData } from 'aws-amplify/storage';
+import { uploadData, list } from 'aws-amplify/storage';
 import '@aws-amplify/ui-react/styles.css';
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function App() {
   const [file, setFile] = useState(null);
@@ -9,6 +15,18 @@ export default function App() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+
+  const fetchFiles = async () => {
+    try {
+      const { items } = await list({ prefix: '', options: { listAll: true } });
+      setUploadedFiles(items.sort((a, b) => b.lastModified - a.lastModified));
+    } catch (error) {
+      console.error('Error listing files:', error);
+    }
+  };
+
+  useEffect(() => { fetchFiles(); }, []);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -70,7 +88,7 @@ export default function App() {
       console.log('File successfully uploaded to:', result.key);
       setProgress(null);
       setUploadStatus("Upload successful!");
-      alert("Upload successful!");
+      fetchFiles();
 
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -125,6 +143,32 @@ export default function App() {
             {uploadStatus && <p style={styles.status}>{uploadStatus}</p>}
           </div>
 
+          <div style={styles.fileListBox}>
+            <h2>Uploaded Files</h2>
+            {uploadedFiles.length === 0 ? (
+              <p style={{ color: '#999' }}>No files uploaded yet.</p>
+            ) : (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>File</th>
+                    <th style={styles.th}>Size</th>
+                    <th style={styles.th}>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {uploadedFiles.map((item) => (
+                    <tr key={item.key}>
+                      <td style={styles.td}>{item.key}</td>
+                      <td style={styles.td}>{formatBytes(item.size)}</td>
+                      <td style={styles.td}>{item.lastModified?.toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
           <button onClick={signOut} style={styles.signOutBtn}>Sign out</button>
         </main>
       )}
@@ -133,7 +177,7 @@ export default function App() {
 } // End of App Component
 
 const styles = {
-  container: { width: '400px', margin: '50px auto', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
+  container: { width: '650px', margin: '50px auto', fontFamily: 'Arial, sans-serif', textAlign: 'center' },
   uploadBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px' },
   dropZone: { position: 'relative', border: '2px dashed #aaa', borderRadius: '6px', padding: '20px', marginBottom: '15px', color: '#666', cursor: 'pointer', transition: 'border-color 0.2s, background 0.2s' },
   dropZoneActive: { borderColor: '#0073e6', background: '#e8f3ff', color: '#0073e6' },
@@ -145,5 +189,9 @@ const styles = {
   progressTrack: { position: 'relative', background: '#e0e0e0', borderRadius: '4px', height: '20px', marginTop: '15px', overflow: 'hidden' },
   progressBar: { height: '100%', background: '#0073e6', borderRadius: '4px', transition: 'width 0.2s ease' },
   progressLabel: { position: 'absolute', top: 0, left: 0, right: 0, lineHeight: '20px', fontSize: '12px', fontWeight: 'bold', color: 'white', textAlign: 'center' },
-  status: { marginTop: '10px', fontWeight: 'bold', color: 'green' }
+  status: { marginTop: '10px', fontWeight: 'bold', color: 'green' },
+  fileListBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px', textAlign: 'left' },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
+  th: { borderBottom: '2px solid #ddd', padding: '8px', textAlign: 'left', color: '#555' },
+  td: { borderBottom: '1px solid #f0f0f0', padding: '8px', wordBreak: 'break-all' }
 };
