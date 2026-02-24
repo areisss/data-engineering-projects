@@ -21,3 +21,7 @@ variable "bucket_id" {
 variable "dynamodb_table_name" {
   description = "DynamoDB PhotoMetadata table name (injected into photo processor Lambda)"
 }
+
+variable "cognito_user_pool_arn" {
+  description = "ARN of the Cognito User Pool used to authorize the API Gateway"
+}

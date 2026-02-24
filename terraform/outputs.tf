@@ -22,3 +22,8 @@ output "glue_job_name" {
   description = "Glue job name for the WhatsApp silver transformation"
   value       = module.analytics.glue_job_name
 }
+
+output "photos_api_url" {
+  description = "Base URL for the Photos REST API (GET /photos requires Cognito JWT)"
+  value       = module.compute.photos_api_url
+}

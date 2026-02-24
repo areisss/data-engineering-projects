@@ -155,3 +155,160 @@ resource "aws_lambda_permission" "s3_invoke_photo_processor" {
   principal     = "s3.amazonaws.com"
   source_arn    = var.bucket_arn
 }
+
+# ---------------------------------------------------------------------------
+# Photos API Lambda + API Gateway (Step 6)
+# GET /photos  →  DynamoDB scan + pre-signed S3 URLs
+# Cognito User Pools authorizer; OPTIONS MOCK for CORS preflight.
+# ---------------------------------------------------------------------------
+
+data "archive_file" "photos_api" {
+  type        = "zip"
+  source_file = "${path.root}/lambdas/photos_api/handler.py"
+  output_path = "${path.root}/lambdas/photos_api/handler.zip"
+}
+
+resource "aws_lambda_function" "photos_api" {
+  filename         = data.archive_file.photos_api.output_path
+  function_name    = "${var.project_name}-photos-api-${var.environment}"
+  role             = aws_iam_role.lambda.arn
+  handler          = "handler.handler"
+  runtime          = "python3.12"
+  source_code_hash = data.archive_file.photos_api.output_base64sha256
+  timeout          = 30
+  memory_size      = 256
+
+  environment {
+    variables = {
+      BUCKET_NAME = var.bucket_id
+      TABLE_NAME  = var.dynamodb_table_name
+    }
+  }
+
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_api_gateway_rest_api" "main" {
+  name        = "${var.project_name}-api-${var.environment}"
+  description = "Photos REST API"
+
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_api_gateway_authorizer" "cognito" {
+  name          = "cognito"
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  type          = "COGNITO_USER_POOLS"
+  provider_arns = [var.cognito_user_pool_arn]
+}
+
+resource "aws_api_gateway_resource" "photos" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "photos"
+}
+
+# GET /photos
+resource "aws_api_gateway_method" "get_photos" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.photos.id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
+}
+
+resource "aws_api_gateway_integration" "get_photos" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.photos.id
+  http_method             = aws_api_gateway_method.get_photos.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.photos_api.invoke_arn
+}
+
+# OPTIONS /photos — CORS preflight (MOCK integration, no auth)
+resource "aws_api_gateway_method" "options_photos" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.photos.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "options_photos" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.photos.id
+  http_method = aws_api_gateway_method.options_photos.http_method
+  type        = "MOCK"
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "options_photos_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.photos.id
+  http_method = aws_api_gateway_method.options_photos.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_photos" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.photos.id
+  http_method = aws_api_gateway_method.options_photos.http_method
+  status_code = aws_api_gateway_method_response.options_photos_200.status_code
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+  depends_on = [aws_api_gateway_method_response.options_photos_200]
+}
+
+resource "aws_api_gateway_deployment" "main" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+
+  triggers = {
+    redeployment = sha1(jsonencode([
+      aws_api_gateway_resource.photos.id,
+      aws_api_gateway_method.get_photos.id,
+      aws_api_gateway_integration.get_photos.id,
+      aws_api_gateway_method.options_photos.id,
+      aws_api_gateway_integration.options_photos.id,
+    ]))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  depends_on = [
+    aws_api_gateway_integration.get_photos,
+    aws_api_gateway_integration.options_photos,
+    aws_api_gateway_integration_response.options_photos,
+  ]
+}
+
+resource "aws_api_gateway_stage" "main" {
+  deployment_id = aws_api_gateway_deployment.main.id
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  stage_name    = var.environment
+}
+
+resource "aws_lambda_permission" "apigw_invoke_photos_api" {
+  statement_id  = "AllowAPIGatewayInvokePhotosAPI"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.photos_api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
+}

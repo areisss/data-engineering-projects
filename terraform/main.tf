@@ -10,13 +10,14 @@ module "storage" {
 }
 
 module "compute" {
-  source              = "./modules/compute"
-  project_name        = var.project_name
-  environment         = var.environment
-  bucket_id           = module.storage.bucket_id
-  bucket_arn          = module.storage.bucket_arn
-  dynamodb_arn        = module.storage.photo_metadata_table_arn
-  dynamodb_table_name = module.storage.photo_metadata_table_name
+  source                = "./modules/compute"
+  project_name          = var.project_name
+  environment           = var.environment
+  bucket_id             = module.storage.bucket_id
+  bucket_arn            = module.storage.bucket_arn
+  dynamodb_arn          = module.storage.photo_metadata_table_arn
+  dynamodb_table_name   = module.storage.photo_metadata_table_name
+  cognito_user_pool_arn = var.cognito_user_pool_arn
 }
 
 # S3 bucket notifications are managed here (root module) to avoid conflicts

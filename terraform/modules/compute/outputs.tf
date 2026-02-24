@@ -13,3 +13,7 @@ output "whatsapp_bronze_lambda_arn" {
 output "photo_processor_lambda_arn" {
   value = aws_lambda_function.photo_processor.arn
 }
+
+output "photos_api_url" {
+  value = "${aws_api_gateway_stage.main.invoke_url}/photos"
+}
