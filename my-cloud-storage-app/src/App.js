@@ -21,14 +21,15 @@ export default function App() {
       const extension = fileName.split('.').pop().toLowerCase();
 
       // 1. Logic to determine the S3 path
-      let storagePath = `public/misc/${fileName}`;
+      // Remove "public/" from the strings below
+      let storagePath = `misc/${fileName}`;
 
       if (extension === 'zip') {
-        storagePath = `public/uploads-landing/${fileName}`;
+        storagePath = `uploads-landing/${fileName}`;
       } else if (extension === 'txt') {
-        storagePath = `public/raw-whatsapp-uploads/${fileName}`;
+        storagePath = `raw-whatsapp-uploads/${fileName}`;
       } else if (['jpg', 'jpeg', 'png', 'webp'].includes(extension)) {
-        storagePath = `public/raw-photos/${fileName}`;
+        storagePath = `raw-photos/${fileName}`;
       }
 
       // 2. The S3 Upload with Metadata
