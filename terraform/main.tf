@@ -10,12 +10,13 @@ module "storage" {
 }
 
 module "compute" {
-  source       = "./modules/compute"
-  project_name = var.project_name
-  environment  = var.environment
-  bucket_id    = module.storage.bucket_id
-  bucket_arn   = module.storage.bucket_arn
-  dynamodb_arn = module.storage.photo_metadata_table_arn
+  source              = "./modules/compute"
+  project_name        = var.project_name
+  environment         = var.environment
+  bucket_id           = module.storage.bucket_id
+  bucket_arn          = module.storage.bucket_arn
+  dynamodb_arn        = module.storage.photo_metadata_table_arn
+  dynamodb_table_name = module.storage.photo_metadata_table_name
 }
 
 # S3 bucket notifications are managed here (root module) to avoid conflicts
@@ -28,6 +29,12 @@ resource "aws_s3_bucket_notification" "main" {
     events              = ["s3:ObjectCreated:*"]
     filter_prefix       = "raw-whatsapp-uploads/"
     filter_suffix       = ".txt"
+  }
+
+  lambda_function {
+    lambda_function_arn = module.compute.photo_processor_lambda_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "raw-photos/"
   }
 
   depends_on = [module.compute]

@@ -15,5 +15,9 @@ variable "dynamodb_arn" {
 }
 
 variable "bucket_id" {
-  description = "S3 bucket name (used for S3 notification filter)"
+  description = "S3 bucket name (used for S3 notification filter and Lambda env var)"
+}
+
+variable "dynamodb_table_name" {
+  description = "DynamoDB PhotoMetadata table name (injected into photo processor Lambda)"
 }
