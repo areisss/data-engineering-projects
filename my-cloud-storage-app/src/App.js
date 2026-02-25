@@ -19,6 +19,8 @@ export default function App() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [photos, setPhotos] = useState([]);
   const [photosLoading, setPhotosLoading] = useState(false);
+  const [sortBy, setSortBy] = useState('uploaded_at');
+  const [tagFilter, setTagFilter] = useState('');
 
   const fetchFiles = async () => {
     try {
@@ -29,14 +31,20 @@ export default function App() {
     }
   };
 
-  const fetchPhotos = async () => {
+  // sort and tag are passed explicitly so onChange handlers can pass the
+  // new value before React state has flushed.
+  const fetchPhotos = async (sort = sortBy, tag = tagFilter) => {
     const apiUrl = process.env.REACT_APP_PHOTOS_API_URL;
     if (!apiUrl) return;
     setPhotosLoading(true);
     try {
       const session = await fetchAuthSession();
       const token = session.tokens?.idToken?.toString();
-      const res = await fetch(apiUrl, { headers: { Authorization: token } });
+      const params = new URLSearchParams({ sort_by: sort });
+      if (tag) params.set('tag', tag);
+      const res = await fetch(`${apiUrl}?${params}`, {
+        headers: { Authorization: token },
+      });
       setPhotos(await res.json());
     } catch (err) {
       console.error('Error fetching photos:', err);
@@ -175,10 +183,52 @@ export default function App() {
           <div style={styles.galleryBox}>
             <div style={styles.galleryHeader}>
               <h2 style={{ margin: 0 }}>Photo Gallery</h2>
-              <button onClick={fetchPhotos} style={styles.refreshBtn} disabled={photosLoading}>
+              <button
+                onClick={() => fetchPhotos()}
+                style={styles.refreshBtn}
+                disabled={photosLoading}
+              >
                 {photosLoading ? 'Loading...' : 'Refresh'}
               </button>
             </div>
+
+            <div style={styles.galleryControls}>
+              <label style={styles.controlLabel}>
+                Sort by{' '}
+                <select
+                  value={sortBy}
+                  onChange={e => {
+                    setSortBy(e.target.value);
+                    fetchPhotos(e.target.value, tagFilter);
+                  }}
+                  style={styles.controlSelect}
+                  aria-label="Sort by"
+                >
+                  <option value="uploaded_at">Date uploaded</option>
+                  <option value="taken_at">Date taken</option>
+                </select>
+              </label>
+              <label style={styles.controlLabel}>
+                Tag{' '}
+                <select
+                  value={tagFilter}
+                  onChange={e => {
+                    setTagFilter(e.target.value);
+                    fetchPhotos(sortBy, e.target.value);
+                  }}
+                  style={styles.controlSelect}
+                  aria-label="Filter by tag"
+                >
+                  <option value="">All</option>
+                  <option value="landscape">landscape</option>
+                  <option value="portrait">portrait</option>
+                  <option value="square">square</option>
+                  <option value="flash">flash</option>
+                  <option value="gps">gps</option>
+                </select>
+              </label>
+            </div>
+
             {photosLoading ? (
               <p style={{ color: '#999' }}>Loading photos...</p>
             ) : photos.length === 0 ? (
@@ -196,8 +246,17 @@ export default function App() {
                       <div style={styles.photoName} title={photo.filename}>{photo.filename}</div>
                       <div style={styles.photoDims}>{photo.width} &times; {photo.height}</div>
                       <div style={styles.photoDate}>
-                        {new Date(photo.uploaded_at).toLocaleDateString()}
+                        {photo.taken_at
+                          ? `Taken: ${new Date(photo.taken_at).toLocaleDateString()}`
+                          : new Date(photo.uploaded_at).toLocaleDateString()}
                       </div>
+                      {photo.tags && photo.tags.length > 0 && (
+                        <div style={styles.tagRow}>
+                          {photo.tags.map(tag => (
+                            <span key={tag} style={styles.tagChip}>{tag}</span>
+                          ))}
+                        </div>
+                      )}
                       <a
                         href={photo.original_url}
                         download={photo.filename}
@@ -266,7 +325,10 @@ const styles = {
   progressLabel: { position: 'absolute', top: 0, left: 0, right: 0, lineHeight: '20px', fontSize: '12px', fontWeight: 'bold', color: 'white', textAlign: 'center' },
   status: { marginTop: '10px', fontWeight: 'bold', color: 'green' },
   galleryBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px', textAlign: 'left' },
-  galleryHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
+  galleryHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
+  galleryControls: { display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '14px', fontSize: '13px' },
+  controlLabel: { display: 'flex', alignItems: 'center', gap: '6px', color: '#555' },
+  controlSelect: { padding: '3px 6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc' },
   refreshBtn: { backgroundColor: '#f0f0f0', border: '1px solid #ccc', borderRadius: '4px', padding: '4px 12px', cursor: 'pointer', fontSize: '13px' },
   galleryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '16px' },
   photoCard: { border: '1px solid #e8e8e8', borderRadius: '6px', overflow: 'hidden' },
@@ -274,7 +336,9 @@ const styles = {
   photoInfo: { padding: '8px', fontSize: '12px', textAlign: 'center' },
   photoName: { fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' },
   photoDims: { color: '#888', marginBottom: '2px' },
-  photoDate: { color: '#888', marginBottom: '6px' },
+  photoDate: { color: '#888', marginBottom: '4px' },
+  tagRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '3px', marginBottom: '6px' },
+  tagChip: { backgroundColor: '#e8f0fe', color: '#1a56db', borderRadius: '10px', padding: '1px 7px', fontSize: '10px', fontWeight: '500' },
   downloadLink: { display: 'inline-block', padding: '4px 10px', backgroundColor: '#0073e6', color: 'white', borderRadius: '4px', textDecoration: 'none', fontSize: '11px' },
   fileListBox: { border: '1px solid #ddd', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px', textAlign: 'left' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },

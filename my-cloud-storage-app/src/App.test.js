@@ -68,10 +68,10 @@ test('delete button does not remove when confirmation is cancelled', async () =>
 });
 
 // ---------------------------------------------------------------------------
-// Photo Gallery
+// Photo Gallery helpers
 // ---------------------------------------------------------------------------
 
-const makePhoto = (id = 'abc123') => ({
+const makePhoto = (id = 'abc123', overrides = {}) => ({
   photo_id: id,
   filename: `${id}.jpg`,
   thumbnail_url: `https://s3.example.com/thumbnails/${id}.jpg`,
@@ -79,6 +79,7 @@ const makePhoto = (id = 'abc123') => ({
   width: 1920,
   height: 1080,
   uploaded_at: '2024-03-01T10:00:00Z',
+  ...overrides,
 });
 
 describe('Photo Gallery', () => {
@@ -94,17 +95,34 @@ describe('Photo Gallery', () => {
     delete global.fetch;
   });
 
+  // --- structure ---
+
   test('renders gallery section heading', () => {
     render(<App />);
     expect(screen.getByText(/photo gallery/i)).toBeInTheDocument();
   });
 
+  test('renders sort-by dropdown with expected options', () => {
+    render(<App />);
+    const sortSelect = screen.getByRole('combobox', { name: /sort by/i });
+    expect(sortSelect).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /date uploaded/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /date taken/i })).toBeInTheDocument();
+  });
+
+  test('renders tag filter dropdown with "All" option', () => {
+    render(<App />);
+    const tagSelect = screen.getByRole('combobox', { name: /filter by tag/i });
+    expect(tagSelect).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /^all$/i })).toBeInTheDocument();
+  });
+
   test('shows empty state when no photos are returned', async () => {
     render(<App />);
-    expect(
-      await screen.findByText(/no photos yet/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/no photos yet/i)).toBeInTheDocument();
   });
+
+  // --- photo card content ---
 
   test('shows thumbnail for each photo returned by the API', async () => {
     global.fetch = jest.fn().mockResolvedValue({
@@ -138,10 +156,103 @@ describe('Photo Gallery', () => {
     expect(link).toHaveAttribute('href', 'https://s3.example.com/originals/sky03.jpg');
   });
 
+  // --- date display ---
+
+  test('shows taken_at date prefixed with "Taken:" when present', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve([makePhoto('p1', { taken_at: '2023-07-04T12:00:00+00:00' })]),
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText(/taken:/i)).toBeInTheDocument();
+  });
+
+  test('falls back to uploaded_at date when taken_at is absent', async () => {
+    const uploadedAt = '2024-03-01T10:00:00Z';
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve([makePhoto('p2', { uploaded_at: uploadedAt })]),
+    });
+
+    render(<App />);
+
+    // Wait for photo card, then verify "Taken:" label is NOT shown
+    await screen.findByTitle('p2.jpg');
+    expect(screen.queryByText(/taken:/i)).not.toBeInTheDocument();
+    // The formatted uploaded_at date should appear
+    const formatted = new Date(uploadedAt).toLocaleDateString();
+    expect(screen.getByText(formatted)).toBeInTheDocument();
+  });
+
+  // --- tags ---
+
+  test('displays tags as chips on photo card', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve([makePhoto('p3', { tags: ['landscape', 'flash'] })]),
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('landscape')).toBeInTheDocument();
+    expect(screen.getByText('flash')).toBeInTheDocument();
+  });
+
+  test('no tag chips rendered when tags list is empty', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve([makePhoto('p4', { tags: [] })]),
+    });
+
+    render(<App />);
+
+    await screen.findByTitle('p4.jpg');
+    // queryByText would also match the <option> in the tag dropdown, so scope to <span> chips only
+    expect(screen.queryAllByText('landscape', { selector: 'span' })).toHaveLength(0);
+  });
+
+  // --- controls trigger refetch ---
+
+  test('changing sort dropdown refetches with sort_by=taken_at', async () => {
+    render(<App />);
+    await screen.findByText(/no photos yet/i);
+
+    fireEvent.change(screen.getByRole('combobox', { name: /sort by/i }), {
+      target: { value: 'taken_at' },
+    });
+
+    await waitFor(() => {
+      const urls = global.fetch.mock.calls.map(([url]) => url);
+      expect(urls.some(u => u.includes('sort_by=taken_at'))).toBe(true);
+    });
+  });
+
+  test('changing tag filter refetches with tag=landscape', async () => {
+    render(<App />);
+    await screen.findByText(/no photos yet/i);
+
+    fireEvent.change(screen.getByRole('combobox', { name: /filter by tag/i }), {
+      target: { value: 'landscape' },
+    });
+
+    await waitFor(() => {
+      const urls = global.fetch.mock.calls.map(([url]) => url);
+      expect(urls.some(u => u.includes('tag=landscape'))).toBe(true);
+    });
+  });
+
+  test('initial fetch includes sort_by query param', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('sort_by=uploaded_at'),
+        expect.any(Object),
+      );
+    });
+  });
+
   test('refresh button re-fetches photos', async () => {
     render(<App />);
 
-    // Wait for initial fetch to settle
     await screen.findByText(/no photos yet/i);
 
     fireEvent.click(screen.getByRole('button', { name: /refresh/i }));
