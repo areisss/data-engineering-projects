@@ -132,14 +132,18 @@ def main():
     # Overwrite only the date-partitions present in this run, leaving others intact.
     spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
 
-    bronze_path = f"s3://{bucket}/bronze/whatsapp/"
-    silver_path = f"s3://{bucket}/silver/whatsapp/"
+    bronze_prefix = "bronze/whatsapp/"
+    bronze_path   = f"s3://{bucket}/{bronze_prefix}"
+    silver_path   = f"s3://{bucket}/silver/whatsapp/"
 
-    # Read every file under the bronze prefix as (uri, content).
-    try:
-        raw_rdd = sc.wholeTextFiles(bronze_path)
-    except Exception as exc:  # prefix doesn't exist yet
-        print(f"Could not read {bronze_path}: {exc} — exiting.")
+    # Check the bronze prefix exists before handing off to Spark.
+    # sc.wholeTextFiles() resolves the path lazily, so a missing prefix raises
+    # inside a Spark action (outside any try/except) rather than at call time.
+    import boto3 as _boto3
+    _s3_client = _boto3.client("s3")
+    _resp = _s3_client.list_objects_v2(Bucket=bucket, Prefix=bronze_prefix, MaxKeys=1)
+    if _resp.get("KeyCount", 0) == 0:
+        print(f"No files under s3://{bucket}/{bronze_prefix} — exiting.")
         job.commit()
         return
 
@@ -149,7 +153,7 @@ def main():
             return []
         return parse_file(s3_key_from_uri(uri), content)
 
-    rows_rdd = raw_rdd.flatMap(_parse)
+    rows_rdd = sc.wholeTextFiles(bronze_path).flatMap(_parse)
 
     if rows_rdd.isEmpty():
         print("No WhatsApp messages found in bronze layer — exiting.")
