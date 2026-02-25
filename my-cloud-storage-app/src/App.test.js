@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 import HomePage from './pages/HomePage';
 import LibraryPage from './pages/LibraryPage';
+import PhotosPage from './pages/PhotosPage';
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -39,6 +40,13 @@ const renderLibraryPage = () =>
     </MemoryRouter>
   );
 
+const renderPhotosPage = () =>
+  render(
+    <MemoryRouter>
+      <PhotosPage />
+    </MemoryRouter>
+  );
+
 const renderApp = (initialPath = '/') =>
   render(
     <MemoryRouter initialEntries={[initialPath]}>
@@ -59,6 +67,15 @@ describe('App routing', () => {
   test('renders library page at /library', () => {
     renderApp('/library');
     expect(screen.getByRole('heading', { name: /library/i })).toBeInTheDocument();
+  });
+
+  test('renders photos page at /library/photos', async () => {
+    process.env.REACT_APP_PHOTOS_API_URL = 'https://api.example.com/photos';
+    global.fetch = jest.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    renderApp('/library/photos');
+    expect(screen.getByRole('heading', { name: /photos/i })).toBeInTheDocument();
+    delete process.env.REACT_APP_PHOTOS_API_URL;
+    delete global.fetch;
   });
 });
 
@@ -154,5 +171,133 @@ describe('LibraryPage', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(await screen.findByText('Artur Carvalho Reis')).toBeInTheDocument();
+  });
+
+  test('Photos button navigates to /library/photos', async () => {
+    process.env.REACT_APP_PHOTOS_API_URL = 'https://api.example.com/photos';
+    global.fetch = jest.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    render(
+      <MemoryRouter initialEntries={['/library']}>
+        <App />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /photos/i }));
+    expect(await screen.findByRole('heading', { name: /^photos$/i })).toBeInTheDocument();
+    delete process.env.REACT_APP_PHOTOS_API_URL;
+    delete global.fetch;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PhotosPage
+// ---------------------------------------------------------------------------
+
+const makePhoto = (id = 'abc123', overrides = {}) => ({
+  photo_id: id,
+  filename: `${id}.jpg`,
+  thumbnail_url: `https://s3.example.com/thumbnails/${id}.jpg`,
+  original_url: `https://s3.example.com/originals/${id}.jpg`,
+  width: 1920,
+  height: 1080,
+  uploaded_at: '2024-03-01T10:00:00Z',
+  ...overrides,
+});
+
+describe('PhotosPage', () => {
+  beforeEach(() => {
+    process.env.REACT_APP_PHOTOS_API_URL = 'https://api.example.com/photos';
+    global.fetch = jest.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+  });
+
+  afterEach(() => {
+    delete process.env.REACT_APP_PHOTOS_API_URL;
+    delete global.fetch;
+  });
+
+  test('renders Photos heading', () => {
+    renderPhotosPage();
+    expect(screen.getByRole('heading', { name: /^photos$/i })).toBeInTheDocument();
+  });
+
+  test('renders sort-by and tag-filter controls', () => {
+    renderPhotosPage();
+    expect(screen.getByRole('combobox', { name: /sort by/i })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /filter by tag/i })).toBeInTheDocument();
+  });
+
+  test('shows empty state when no photos returned', async () => {
+    renderPhotosPage();
+    expect(await screen.findByText(/no photos yet/i)).toBeInTheDocument();
+  });
+
+  test('shows thumbnails for returned photos', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve([makePhoto('p1')]),
+    });
+    renderPhotosPage();
+    const img = await screen.findByAltText('p1.jpg');
+    expect(img).toHaveAttribute('src', 'https://s3.example.com/thumbnails/p1.jpg');
+  });
+
+  test('shows taken_at when present', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve([makePhoto('p2', { taken_at: '2023-07-04T12:00:00+00:00' })]),
+    });
+    renderPhotosPage();
+    expect(await screen.findByText(/taken:/i)).toBeInTheDocument();
+  });
+
+  test('shows tag chips', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve([makePhoto('p3', { tags: ['landscape', 'flash'] })]),
+    });
+    renderPhotosPage();
+    expect(await screen.findByText('landscape')).toBeInTheDocument();
+    expect(screen.getByText('flash')).toBeInTheDocument();
+  });
+
+  test('initial fetch includes sort_by param', async () => {
+    renderPhotosPage();
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('sort_by=uploaded_at'),
+        expect.any(Object),
+      );
+    });
+  });
+
+  test('changing sort refetches with sort_by=taken_at', async () => {
+    renderPhotosPage();
+    await screen.findByText(/no photos yet/i);
+    fireEvent.change(screen.getByRole('combobox', { name: /sort by/i }), {
+      target: { value: 'taken_at' },
+    });
+    await waitFor(() => {
+      const urls = global.fetch.mock.calls.map(([url]) => url);
+      expect(urls.some(u => u.includes('sort_by=taken_at'))).toBe(true);
+    });
+  });
+
+  test('changing tag refetches with tag=landscape', async () => {
+    renderPhotosPage();
+    await screen.findByText(/no photos yet/i);
+    fireEvent.change(screen.getByRole('combobox', { name: /filter by tag/i }), {
+      target: { value: 'landscape' },
+    });
+    await waitFor(() => {
+      const urls = global.fetch.mock.calls.map(([url]) => url);
+      expect(urls.some(u => u.includes('tag=landscape'))).toBe(true);
+    });
+  });
+
+  test('back button navigates to /library', async () => {
+    render(
+      <MemoryRouter initialEntries={['/library/photos']}>
+        <App />
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('heading', { name: /^photos$/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /library/i }));
+    expect(await screen.findByRole('heading', { name: /^library$/i })).toBeInTheDocument();
   });
 });
