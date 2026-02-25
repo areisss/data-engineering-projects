@@ -42,6 +42,19 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      - name: Build photo processor package
+        run: |
+          python3 -m pip install pillow \
+            --platform manylinux_2_28_x86_64 \
+            --implementation cp \
+            --python-version 312 \
+            --abi cp312 \
+            --only-binary=:all: \
+            --target lambdas/photo_processor/package \
+            --upgrade --quiet
+          cp lambdas/photo_processor/handler.py \
+             lambdas/photo_processor/package/handler.py
+
       - name: Terraform Init
         run: terraform init
 
