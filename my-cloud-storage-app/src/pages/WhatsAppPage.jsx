@@ -25,7 +25,8 @@ export default function WhatsAppPage() {
       const res = await fetch(`${apiUrl}?${params}`, {
         headers: { Authorization: token },
       });
-      setMessages(await res.json());
+      const data = await res.json();
+      setMessages(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching messages:', err);
     } finally {

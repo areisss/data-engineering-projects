@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 
@@ -17,6 +17,7 @@ export default function App() {
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/library/photos" element={<PhotosPage />} />
           <Route path="/library/whatsapp" element={<WhatsAppPage />} />
+          <Route path="*" element={<Navigate to="/library" replace />} />
         </Routes>
       )}
     </Authenticator>
