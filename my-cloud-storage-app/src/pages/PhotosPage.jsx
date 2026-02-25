@@ -107,13 +107,6 @@ export default function PhotosPage() {
                     style={styles.thumb}
                   />
                   <div style={styles.info}>
-                    <div style={styles.filename} title={photo.filename}>{photo.filename}</div>
-                    <div style={styles.dims}>{photo.width} × {photo.height}</div>
-                    <div style={styles.date}>
-                      {photo.taken_at
-                        ? `Taken: ${new Date(photo.taken_at).toLocaleDateString()}`
-                        : new Date(photo.uploaded_at).toLocaleDateString()}
-                    </div>
                     {photo.tags && photo.tags.length > 0 && (
                       <div style={styles.tagRow}>
                         {photo.tags.map(tag => (
@@ -157,9 +150,6 @@ const styles = {
   card:         { border: '1px solid #e8e8e8', borderRadius: '6px', overflow: 'hidden' },
   thumb:        { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', background: '#f5f5f5' },
   info:         { padding: '8px', fontSize: '12px', textAlign: 'center' },
-  filename:     { fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' },
-  dims:         { color: '#888', marginBottom: '2px' },
-  date:         { color: '#888', marginBottom: '4px' },
   tagRow:       { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '3px', marginBottom: '6px' },
   tagChip:      { backgroundColor: '#e8f0fe', color: '#1a56db', borderRadius: '10px', padding: '1px 7px', fontSize: '10px', fontWeight: '500' },
   downloadLink: { display: 'inline-block', padding: '4px 10px', backgroundColor: '#0073e6', color: 'white', borderRadius: '4px', textDecoration: 'none', fontSize: '11px' },

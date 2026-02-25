@@ -404,12 +404,12 @@ describe('PhotosPage', () => {
     expect(img).toHaveAttribute('src', 'https://s3.example.com/thumbnails/p1.jpg');
   });
 
-  test('shows taken_at when present', async () => {
+  test('shows download link for each photo', async () => {
     global.fetch = jest.fn().mockResolvedValue({
-      json: () => Promise.resolve([makePhoto('p2', { taken_at: '2023-07-04T12:00:00+00:00' })]),
+      json: () => Promise.resolve([makePhoto('p2')]),
     });
     renderPhotosPage();
-    expect(await screen.findByText(/taken:/i)).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /download/i })).toBeInTheDocument();
   });
 
   test('shows tag chips', async () => {
