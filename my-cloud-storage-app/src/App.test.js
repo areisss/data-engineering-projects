@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import LibraryPage from './pages/LibraryPage';
 import PhotosPage from './pages/PhotosPage';
 import WhatsAppPage from './pages/WhatsAppPage';
+import OtherFilesPage from './pages/OtherFilesPage';
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -20,6 +21,7 @@ jest.mock('@aws-amplify/ui-react', () => ({
 jest.mock('aws-amplify/storage', () => ({
   uploadData: jest.fn(),
   list: jest.fn(() => Promise.resolve({ items: [] })),
+  getUrl: jest.fn(() => Promise.resolve({ url: new URL('https://s3.example.com/file.zip') })),
   remove: (...args) => mockRemove(...args),
 }));
 
@@ -52,6 +54,13 @@ const renderWhatsAppPage = () =>
   render(
     <MemoryRouter>
       <WhatsAppPage />
+    </MemoryRouter>
+  );
+
+const renderOtherFilesPage = () =>
+  render(
+    <MemoryRouter>
+      <OtherFilesPage />
     </MemoryRouter>
   );
 
@@ -93,6 +102,11 @@ describe('App routing', () => {
     expect(screen.getByRole('heading', { name: /whatsapp messages/i })).toBeInTheDocument();
     delete process.env.REACT_APP_CHATS_API_URL;
     delete global.fetch;
+  });
+
+  test('renders other files page at /library/files', async () => {
+    renderApp('/library/files');
+    expect(screen.getByRole('heading', { name: /other files/i })).toBeInTheDocument();
   });
 });
 
@@ -216,6 +230,76 @@ describe('LibraryPage', () => {
     expect(await screen.findByRole('heading', { name: /whatsapp messages/i })).toBeInTheDocument();
     delete process.env.REACT_APP_CHATS_API_URL;
     delete global.fetch;
+  });
+
+  test('Other Files button navigates to /library/files', async () => {
+    render(
+      <MemoryRouter initialEntries={['/library']}>
+        <App />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /other files/i }));
+    expect(await screen.findByRole('heading', { name: /other files/i })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OtherFilesPage
+// ---------------------------------------------------------------------------
+
+import { list, getUrl } from 'aws-amplify/storage';
+
+describe('OtherFilesPage', () => {
+  beforeEach(() => {
+    list.mockResolvedValue({ items: [] });
+    getUrl.mockResolvedValue({ url: new URL('https://s3.example.com/file.zip') });
+  });
+
+  test('renders Other Files heading', () => {
+    renderOtherFilesPage();
+    expect(screen.getByRole('heading', { name: /other files/i })).toBeInTheDocument();
+  });
+
+  test('shows empty state when no files returned', async () => {
+    renderOtherFilesPage();
+    expect(await screen.findByText(/no files found/i)).toBeInTheDocument();
+  });
+
+  test('shows file rows when files returned', async () => {
+    list
+      .mockResolvedValueOnce({ items: [{ key: 'misc/report.pdf', size: 2048, lastModified: '2024-03-01T10:00:00Z' }] })
+      .mockResolvedValueOnce({ items: [] });
+    renderOtherFilesPage();
+    expect(await screen.findByText('report.pdf')).toBeInTheDocument();
+    expect(screen.getByText('2.0 KB')).toBeInTheDocument();
+  });
+
+  test('renders a Download link for each file', async () => {
+    list
+      .mockResolvedValueOnce({ items: [{ key: 'misc/notes.txt', size: 512, lastModified: '2024-03-01T10:00:00Z' }] })
+      .mockResolvedValueOnce({ items: [] });
+    renderOtherFilesPage();
+    expect(await screen.findByRole('link', { name: /download/i })).toBeInTheDocument();
+  });
+
+  test('shows files from both misc/ and uploads-landing/ prefixes', async () => {
+    list
+      .mockResolvedValueOnce({ items: [{ key: 'misc/a.pdf', size: 100, lastModified: '2024-01-01' }] })
+      .mockResolvedValueOnce({ items: [{ key: 'uploads-landing/b.zip', size: 200, lastModified: '2024-01-02' }] });
+    renderOtherFilesPage();
+    expect(await screen.findByText('a.pdf')).toBeInTheDocument();
+    expect(screen.getByText('b.zip')).toBeInTheDocument();
+  });
+
+  test('back button navigates to /library', async () => {
+    render(
+      <MemoryRouter initialEntries={['/library/files']}>
+        <App />
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('heading', { name: /other files/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /library/i }));
+    expect(await screen.findByRole('heading', { name: /^library$/i })).toBeInTheDocument();
   });
 });
 
