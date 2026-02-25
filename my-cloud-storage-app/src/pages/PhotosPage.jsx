@@ -82,44 +82,61 @@ export default function PhotosPage() {
         <p style={styles.muted}>Loading photos…</p>
       ) : photos.length === 0 ? (
         <p style={styles.muted}>No photos yet. Upload an image to get started.</p>
-      ) : (
-        <div style={styles.grid}>
-          {photos.map(photo => (
-            <div key={photo.photo_id} style={styles.card}>
-              <img
-                src={photo.thumbnail_url}
-                alt={photo.filename}
-                style={styles.thumb}
-              />
-              <div style={styles.info}>
-                <div style={styles.filename} title={photo.filename}>{photo.filename}</div>
-                <div style={styles.dims}>{photo.width} × {photo.height}</div>
-                <div style={styles.date}>
-                  {photo.taken_at
-                    ? `Taken: ${new Date(photo.taken_at).toLocaleDateString()}`
-                    : new Date(photo.uploaded_at).toLocaleDateString()}
-                </div>
-                {photo.tags && photo.tags.length > 0 && (
-                  <div style={styles.tagRow}>
-                    {photo.tags.map(tag => (
-                      <span key={tag} style={styles.tagChip}>{tag}</span>
-                    ))}
+      ) : (() => {
+        const groupKey = photo => {
+          const d = new Date(photo.taken_at || photo.uploaded_at);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        };
+        const grouped = photos.reduce((acc, p) => {
+          const k = groupKey(p);
+          if (!acc[k]) acc[k] = [];
+          acc[k].push(p);
+          return acc;
+        }, {});
+        const sortedKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+        const formatKey = k => new Date(k + '-02').toLocaleString('default', { month: 'long', year: 'numeric' });
+        return sortedKeys.map(k => (
+          <section key={k} style={styles.section}>
+            <h2 style={styles.sectionHeading}>{formatKey(k)}</h2>
+            <div style={styles.grid}>
+              {grouped[k].map(photo => (
+                <div key={photo.photo_id} style={styles.card}>
+                  <img
+                    src={photo.thumbnail_url}
+                    alt={photo.filename}
+                    style={styles.thumb}
+                  />
+                  <div style={styles.info}>
+                    <div style={styles.filename} title={photo.filename}>{photo.filename}</div>
+                    <div style={styles.dims}>{photo.width} × {photo.height}</div>
+                    <div style={styles.date}>
+                      {photo.taken_at
+                        ? `Taken: ${new Date(photo.taken_at).toLocaleDateString()}`
+                        : new Date(photo.uploaded_at).toLocaleDateString()}
+                    </div>
+                    {photo.tags && photo.tags.length > 0 && (
+                      <div style={styles.tagRow}>
+                        {photo.tags.map(tag => (
+                          <span key={tag} style={styles.tagChip}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                    <a
+                      href={photo.original_url}
+                      download={photo.filename}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={styles.downloadLink}
+                    >
+                      Download
+                    </a>
                   </div>
-                )}
-                <a
-                  href={photo.original_url}
-                  download={photo.filename}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={styles.downloadLink}
-                >
-                  Download
-                </a>
-              </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          </section>
+        ));
+      })()}
     </main>
   );
 }
@@ -134,6 +151,8 @@ const styles = {
   controlLabel: { display: 'flex', alignItems: 'center', gap: '6px', color: '#555' },
   controlSelect: { padding: '3px 6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc' },
   muted:        { color: '#999' },
+  section:      { marginBottom: '32px' },
+  sectionHeading: { fontSize: '1rem', fontWeight: '600', color: '#555', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.05em' },
   grid:         { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '16px' },
   card:         { border: '1px solid #e8e8e8', borderRadius: '6px', overflow: 'hidden' },
   thumb:        { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', background: '#f5f5f5' },

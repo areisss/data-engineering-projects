@@ -64,34 +64,46 @@ export default function OtherFilesPage() {
         <p style={styles.muted}>Loading files…</p>
       ) : files.length === 0 ? (
         <p style={styles.muted}>No files found. Upload a file from the home page to get started.</p>
-      ) : (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>File</th>
-              <th style={styles.th}>Size</th>
-              <th style={styles.th}>Uploaded</th>
-              <th style={styles.th}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {files.map(file => (
-              <tr key={file.key} style={styles.tr}>
-                <td style={styles.td}>{basename(file.key)}</td>
-                <td style={{ ...styles.td, ...styles.tdMuted }}>{formatBytes(file.size)}</td>
-                <td style={{ ...styles.td, ...styles.tdMuted }}>
-                  {file.lastModified ? new Date(file.lastModified).toLocaleDateString() : '—'}
-                </td>
-                <td style={styles.td}>
-                  <a href={file.url} download={basename(file.key)} style={styles.downloadLink}>
-                    Download
-                  </a>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      ) : (() => {
+        const grouped = files.reduce((acc, f) => {
+          const folder = f.key.split('/')[0] || 'other';
+          if (!acc[folder]) acc[folder] = [];
+          acc[folder].push(f);
+          return acc;
+        }, {});
+        const formatFolder = f => f.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        return Object.keys(grouped).map(folder => (
+          <section key={folder} style={styles.section}>
+            <h2 style={styles.sectionHeading}>{formatFolder(folder)}</h2>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>File</th>
+                  <th style={styles.th}>Size</th>
+                  <th style={styles.th}>Uploaded</th>
+                  <th style={styles.th}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {grouped[folder].map(file => (
+                  <tr key={file.key} style={styles.tr}>
+                    <td style={styles.td}>{basename(file.key)}</td>
+                    <td style={{ ...styles.td, ...styles.tdMuted }}>{formatBytes(file.size)}</td>
+                    <td style={{ ...styles.td, ...styles.tdMuted }}>
+                      {file.lastModified ? new Date(file.lastModified).toLocaleDateString() : '—'}
+                    </td>
+                    <td style={styles.td}>
+                      <a href={file.url} download={basename(file.key)} style={styles.downloadLink}>
+                        Download
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ));
+      })()}
     </main>
   );
 }
@@ -103,6 +115,8 @@ const styles = {
   heading:      { fontSize: '1.8rem', fontWeight: '700', margin: 0, color: '#111' },
   refreshBtn:   { backgroundColor: '#f0f0f0', border: '1px solid #ccc', borderRadius: '4px', padding: '4px 12px', cursor: 'pointer', fontSize: '13px' },
   muted:        { color: '#999' },
+  section:      { marginBottom: '32px' },
+  sectionHeading: { fontSize: '1rem', fontWeight: '600', color: '#555', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.05em' },
   table:        { width: '100%', borderCollapse: 'collapse', fontSize: '13px' },
   th:           { textAlign: 'left', padding: '8px 12px', borderBottom: '2px solid #eee', color: '#555', fontWeight: '600' },
   tr:           { borderBottom: '1px solid #f0f0f0' },

@@ -332,6 +332,15 @@ describe('OtherFilesPage', () => {
     expect(screen.getByText('b.zip')).toBeInTheDocument();
   });
 
+  test('shows folder section headings grouped by S3 prefix', async () => {
+    list
+      .mockResolvedValueOnce({ items: [{ key: 'misc/a.pdf', size: 100, lastModified: '2024-01-01' }] })
+      .mockResolvedValueOnce({ items: [{ key: 'uploads-landing/b.zip', size: 200, lastModified: '2024-01-02' }] });
+    renderOtherFilesPage();
+    expect(await screen.findByText('Misc')).toBeInTheDocument();
+    expect(screen.getByText('Uploads Landing')).toBeInTheDocument();
+  });
+
   test('back button navigates to /library', async () => {
     render(
       <MemoryRouter initialEntries={['/library/files']}>
@@ -444,6 +453,14 @@ describe('PhotosPage', () => {
       const urls = global.fetch.mock.calls.map(([url]) => url);
       expect(urls.some(u => u.includes('tag=landscape'))).toBe(true);
     });
+  });
+
+  test('groups photos under year-month section heading', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve([makePhoto('p4', { uploaded_at: '2024-03-15T10:00:00Z' })]),
+    });
+    renderPhotosPage();
+    expect(await screen.findByText('March 2024')).toBeInTheDocument();
   });
 
   test('back button navigates to /library', async () => {
