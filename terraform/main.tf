@@ -18,6 +18,8 @@ module "compute" {
   dynamodb_arn          = module.storage.photo_metadata_table_arn
   dynamodb_table_name   = module.storage.photo_metadata_table_name
   cognito_user_pool_arn = var.cognito_user_pool_arn
+  athena_database       = module.analytics.glue_database_name
+  athena_workgroup      = module.analytics.athena_workgroup_name
 }
 
 # S3 bucket notifications are managed here (root module) to avoid conflicts

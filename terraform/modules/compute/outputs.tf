@@ -17,3 +17,7 @@ output "photo_processor_lambda_arn" {
 output "photos_api_url" {
   value = "${aws_api_gateway_stage.main.invoke_url}/photos"
 }
+
+output "whatsapp_api_url" {
+  value = "${aws_api_gateway_stage.main.invoke_url}/chats"
+}

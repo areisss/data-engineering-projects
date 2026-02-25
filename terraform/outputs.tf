@@ -27,3 +27,8 @@ output "photos_api_url" {
   description = "Base URL for the Photos REST API (GET /photos requires Cognito JWT)"
   value       = module.compute.photos_api_url
 }
+
+output "whatsapp_api_url" {
+  description = "Base URL for the WhatsApp Messages REST API (GET /chats requires Cognito JWT)"
+  value       = module.compute.whatsapp_api_url
+}

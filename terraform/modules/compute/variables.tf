@@ -25,3 +25,11 @@ variable "dynamodb_table_name" {
 variable "cognito_user_pool_arn" {
   description = "ARN of the Cognito User Pool used to authorize the API Gateway"
 }
+
+variable "athena_database" {
+  description = "Glue/Athena database name containing the whatsapp_messages table"
+}
+
+variable "athena_workgroup" {
+  description = "Athena workgroup name to use for query execution"
+}

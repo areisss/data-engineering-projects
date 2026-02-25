@@ -6,6 +6,7 @@ import '@aws-amplify/ui-react/styles.css';
 import HomePage from './pages/HomePage';
 import LibraryPage from './pages/LibraryPage';
 import PhotosPage from './pages/PhotosPage';
+import WhatsAppPage from './pages/WhatsAppPage';
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
           <Route path="/" element={<HomePage signOut={signOut} user={user} />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/library/photos" element={<PhotosPage />} />
+          <Route path="/library/whatsapp" element={<WhatsAppPage />} />
         </Routes>
       )}
     </Authenticator>

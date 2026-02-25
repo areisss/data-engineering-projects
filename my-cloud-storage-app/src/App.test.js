@@ -4,6 +4,7 @@ import App from './App';
 import HomePage from './pages/HomePage';
 import LibraryPage from './pages/LibraryPage';
 import PhotosPage from './pages/PhotosPage';
+import WhatsAppPage from './pages/WhatsAppPage';
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -47,6 +48,13 @@ const renderPhotosPage = () =>
     </MemoryRouter>
   );
 
+const renderWhatsAppPage = () =>
+  render(
+    <MemoryRouter>
+      <WhatsAppPage />
+    </MemoryRouter>
+  );
+
 const renderApp = (initialPath = '/') =>
   render(
     <MemoryRouter initialEntries={[initialPath]}>
@@ -75,6 +83,15 @@ describe('App routing', () => {
     renderApp('/library/photos');
     expect(screen.getByRole('heading', { name: /photos/i })).toBeInTheDocument();
     delete process.env.REACT_APP_PHOTOS_API_URL;
+    delete global.fetch;
+  });
+
+  test('renders whatsapp page at /library/whatsapp', async () => {
+    process.env.REACT_APP_CHATS_API_URL = 'https://api.example.com/chats';
+    global.fetch = jest.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    renderApp('/library/whatsapp');
+    expect(screen.getByRole('heading', { name: /whatsapp messages/i })).toBeInTheDocument();
+    delete process.env.REACT_APP_CHATS_API_URL;
     delete global.fetch;
   });
 });
@@ -184,6 +201,20 @@ describe('LibraryPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /photos/i }));
     expect(await screen.findByRole('heading', { name: /^photos$/i })).toBeInTheDocument();
     delete process.env.REACT_APP_PHOTOS_API_URL;
+    delete global.fetch;
+  });
+
+  test('WhatsApp Messages button navigates to /library/whatsapp', async () => {
+    process.env.REACT_APP_CHATS_API_URL = 'https://api.example.com/chats';
+    global.fetch = jest.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    render(
+      <MemoryRouter initialEntries={['/library']}>
+        <App />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /whatsapp messages/i }));
+    expect(await screen.findByRole('heading', { name: /whatsapp messages/i })).toBeInTheDocument();
+    delete process.env.REACT_APP_CHATS_API_URL;
     delete global.fetch;
   });
 });
@@ -297,6 +328,80 @@ describe('PhotosPage', () => {
       </MemoryRouter>
     );
     expect(await screen.findByRole('heading', { name: /^photos$/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /library/i }));
+    expect(await screen.findByRole('heading', { name: /^library$/i })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WhatsAppPage
+// ---------------------------------------------------------------------------
+
+const makeMessage = (id = 'msg001', overrides = {}) => ({
+  message_id: id,
+  date: '2023-07-04',
+  time: '10:00',
+  sender: 'Alice',
+  message: 'Hello there',
+  word_count: '2',
+  ...overrides,
+});
+
+describe('WhatsAppPage', () => {
+  beforeEach(() => {
+    process.env.REACT_APP_CHATS_API_URL = 'https://api.example.com/chats';
+    global.fetch = jest.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+  });
+
+  afterEach(() => {
+    delete process.env.REACT_APP_CHATS_API_URL;
+    delete global.fetch;
+  });
+
+  test('renders WhatsApp Messages heading', () => {
+    renderWhatsAppPage();
+    expect(screen.getByRole('heading', { name: /whatsapp messages/i })).toBeInTheDocument();
+  });
+
+  test('renders filter controls', () => {
+    renderWhatsAppPage();
+    expect(screen.getByRole('textbox', { name: /filter by sender/i })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /search messages/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /apply/i })).toBeInTheDocument();
+  });
+
+  test('shows empty state when no messages returned', async () => {
+    renderWhatsAppPage();
+    expect(await screen.findByText(/no messages found/i)).toBeInTheDocument();
+  });
+
+  test('shows messages grouped by date', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve([makeMessage('m1')]),
+    });
+    renderWhatsAppPage();
+    expect(await screen.findByText('Hello there')).toBeInTheDocument();
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.getByText('2023-07-04')).toBeInTheDocument();
+  });
+
+  test('initial fetch includes limit param', async () => {
+    renderWhatsAppPage();
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('limit=500'),
+        expect.any(Object),
+      );
+    });
+  });
+
+  test('back button navigates to /library', async () => {
+    render(
+      <MemoryRouter initialEntries={['/library/whatsapp']}>
+        <App />
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('heading', { name: /whatsapp messages/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /library/i }));
     expect(await screen.findByRole('heading', { name: /^library$/i })).toBeInTheDocument();
   });
