@@ -17,8 +17,8 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "data-engineering-tf-state-650251723804"
-    key            = "data-engineering/terraform.tfstate"
+    bucket         = "artur-file-processor-tf-state"
+    key            = "terraform/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "terraform-locks"
     encrypt        = true
