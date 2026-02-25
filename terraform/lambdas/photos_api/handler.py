@@ -20,6 +20,8 @@ CORS_HEADERS = {
     "Access-Control-Allow-Methods": "GET,OPTIONS",
 }
 
+_VALID_SORT_FIELDS = {"taken_at", "uploaded_at"}
+
 
 def _decimal_default(obj):
     if isinstance(obj, Decimal):
@@ -38,6 +40,26 @@ def scan_all(table):
         if not last_key:
             break
         kwargs["ExclusiveStartKey"] = last_key
+    return items
+
+
+def apply_filters_and_sort(items, sort_by="uploaded_at", tag=None):
+    """Filter by tag and sort descending by sort_by field, nulls last.
+
+    sort_by: "uploaded_at" (default) or "taken_at"
+    tag:     case-insensitive match against each item's tags list; None = no filter
+    """
+    if tag:
+        tag_lower = tag.lower()
+        items = [
+            item for item in items
+            if tag_lower in [t.lower() for t in item.get("tags", [])]
+        ]
+
+    field = sort_by if sort_by in _VALID_SORT_FIELDS else "uploaded_at"
+    # Items missing the sort field get "" which sorts before any ISO timestamp,
+    # so with reverse=True they naturally fall to the end of the list.
+    items.sort(key=lambda x: x.get(field) or "", reverse=True)
     return items
 
 
@@ -60,9 +82,13 @@ def handler(event, context):
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
+    params  = event.get("queryStringParameters") or {}
+    sort_by = params.get("sort_by", "uploaded_at")
+    tag     = params.get("tag") or None
+
     table = dynamodb.Table(TABLE_NAME)
     items = scan_all(table)
-    items.sort(key=lambda x: x.get("uploaded_at", ""), reverse=True)
+    items = apply_filters_and_sort(items, sort_by=sort_by, tag=tag)
 
     photos = [build_photo_response(item) for item in items]
 
