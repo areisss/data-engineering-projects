@@ -133,30 +133,45 @@ def main():
     spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
 
     bronze_prefix = "bronze/whatsapp/"
-    bronze_path   = f"s3://{bucket}/{bronze_prefix}"
     silver_path   = f"s3://{bucket}/silver/whatsapp/"
 
-    # Check the bronze prefix exists before handing off to Spark.
-    # sc.wholeTextFiles() resolves the path lazily, so a missing prefix raises
-    # inside a Spark action (outside any try/except) rather than at call time.
+    # ---------------------------------------------------------------------------
+    # Use boto3 to list keys explicitly — sc.wholeTextFiles() does not reliably
+    # recurse into Hive-partitioned sub-prefixes (year=/month=/) in Glue 4.0.
+    # ---------------------------------------------------------------------------
     import boto3 as _boto3
-    _s3_client = _boto3.client("s3")
-    _resp = _s3_client.list_objects_v2(Bucket=bucket, Prefix=bronze_prefix, MaxKeys=1)
-    if _resp.get("KeyCount", 0) == 0:
-        print(f"No files under s3://{bucket}/{bronze_prefix} — exiting.")
+    _s3  = _boto3.client("s3")
+    _pag = _s3.get_paginator("list_objects_v2")
+
+    txt_keys = [
+        obj["Key"]
+        for page in _pag.paginate(Bucket=bucket, Prefix=bronze_prefix)
+        for obj in page.get("Contents", [])
+        if obj["Key"].endswith(".txt")
+    ]
+
+    if not txt_keys:
+        print(f"No .txt files under s3://{bucket}/{bronze_prefix} — exiting.")
         job.commit()
         return
 
-    def _parse(uri_content):
-        uri, content = uri_content
-        if not uri.endswith(".txt"):
-            return []
-        return parse_file(s3_key_from_uri(uri), content)
+    print(f"Found {len(txt_keys)} bronze file(s) to process.")
 
-    rows_rdd = sc.wholeTextFiles(bronze_path).flatMap(_parse)
+    # Capture bucket string for closure serialisation (avoids serialising `args`).
+    _bucket = bucket
+
+    def _read_and_parse(key):
+        """Worker closure: fetch one S3 object and parse it."""
+        import boto3 as _b3
+        _s3w = _b3.client("s3")
+        resp    = _s3w.get_object(Bucket=_bucket, Key=key)
+        content = resp["Body"].read().decode("utf-8", errors="replace")
+        return parse_file(key, content)
+
+    rows_rdd = sc.parallelize(txt_keys, numSlices=len(txt_keys)).flatMap(_read_and_parse)
 
     if rows_rdd.isEmpty():
-        print("No WhatsApp messages found in bronze layer — exiting.")
+        print("No parseable WhatsApp messages found in bronze files — exiting.")
         job.commit()
         return
 
