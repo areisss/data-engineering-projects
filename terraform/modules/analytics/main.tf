@@ -94,11 +94,13 @@ resource "aws_glue_job" "whatsapp_silver" {
   }
 }
 
-# Runs at 05:00 UTC daily, one hour before the crawler (06:00 UTC)
+# Runs at 05:00 UTC daily, one hour before the crawler (06:00 UTC).
+# Set enabled = true to re-activate.
 resource "aws_glue_trigger" "whatsapp_silver_daily" {
   name     = "${var.project_name}-whatsapp-silver-daily-${var.environment}"
   type     = "SCHEDULED"
   schedule = "cron(0 5 * * ? *)"
+  enabled  = false
 
   actions {
     job_name = aws_glue_job.whatsapp_silver.name
@@ -111,7 +113,7 @@ resource "aws_glue_trigger" "whatsapp_silver_daily" {
 }
 
 # Crawler targets silver/whatsapp/ and refreshes partition metadata.
-# Runs one hour after the Glue job as a safety net for catalog drift.
+# Uncomment the schedule line to re-activate daily runs at 06:00 UTC.
 resource "aws_glue_crawler" "whatsapp_silver" {
   name          = "${var.project_name}-whatsapp-silver-${var.environment}"
   role          = aws_iam_role.glue.arn
@@ -121,8 +123,7 @@ resource "aws_glue_crawler" "whatsapp_silver" {
     path = "s3://${var.bucket_id}/silver/whatsapp/"
   }
 
-  # Runs daily at 06:00 UTC after the overnight Glue job
-  schedule = "cron(0 6 * * ? *)"
+  # schedule = "cron(0 6 * * ? *)"
 
   tags = {
     Project     = var.project_name
