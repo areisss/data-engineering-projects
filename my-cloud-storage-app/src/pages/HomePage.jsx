@@ -8,6 +8,7 @@ export default function HomePage({ signOut, user }) {
 
   const [file, setFile] = useState(null);
   const [tier, setTier] = useState('Standard');
+  const [rawOnly, setRawOnly] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(null);
@@ -30,10 +31,18 @@ export default function HomePage({ signOut, user }) {
 
       const fileName = file.name;
       const extension = fileName.split('.').pop().toLowerCase();
-      let storagePath = `misc/${fileName}`;
-      if (extension === 'zip')                                  storagePath = `uploads-landing/${fileName}`;
-      else if (extension === 'txt')                             storagePath = `raw-whatsapp-uploads/${fileName}`;
-      else if (['jpg', 'jpeg', 'png', 'webp'].includes(extension)) storagePath = `raw-photos/${fileName}`;
+      let storagePath;
+      if (rawOnly) {
+        storagePath = `raw-archive/${fileName}`;
+      } else if (extension === 'zip') {
+        storagePath = `uploads-landing/${fileName}`;
+      } else if (extension === 'txt') {
+        storagePath = `raw-whatsapp-uploads/${fileName}`;
+      } else if (['jpg', 'jpeg', 'png', 'webp'].includes(extension)) {
+        storagePath = `raw-photos/${fileName}`;
+      } else {
+        storagePath = `misc/${fileName}`;
+      }
 
       const result = await uploadData({
         key: storagePath,
@@ -105,6 +114,16 @@ export default function HomePage({ signOut, user }) {
           </select>
         </div>
 
+        <label style={styles.rawLabel}>
+          <input
+            type="checkbox"
+            checked={rawOnly}
+            onChange={e => setRawOnly(e.target.checked)}
+            style={styles.rawCheckbox}
+          />
+          Store as raw only (skip processing)
+        </label>
+
         <button onClick={handleUpload} style={styles.button}>Upload to Cloud</button>
 
         {progress !== null && (
@@ -141,6 +160,8 @@ const styles = {
   fileInput:    { position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' },
   tierSelector: { marginBottom: '15px' },
   select:       { marginLeft: '10px', padding: '5px' },
+  rawLabel:     { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#555', marginBottom: '15px', cursor: 'pointer' },
+  rawCheckbox:  { cursor: 'pointer', width: '15px', height: '15px' },
   button:       { backgroundColor: '#0073e6', color: 'white', padding: '10px 20px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px' },
   progressTrack: { position: 'relative', background: '#e0e0e0', borderRadius: '4px', height: '20px', marginTop: '15px', overflow: 'hidden' },
   progressBar:  { height: '100%', background: '#0073e6', borderRadius: '4px', transition: 'width 0.2s ease' },

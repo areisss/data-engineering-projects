@@ -153,6 +153,47 @@ describe('HomePage upload', () => {
     expect(screen.getByRole('button', { name: /upload to cloud/i })).toBeInTheDocument();
   });
 
+  test('renders raw-only checkbox unchecked by default', () => {
+    renderHomePage();
+    expect(screen.getByRole('checkbox', { name: /store as raw only/i })).not.toBeChecked();
+  });
+
+  test('raw-only checkbox can be toggled', () => {
+    renderHomePage();
+    const checkbox = screen.getByRole('checkbox', { name: /store as raw only/i });
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+    fireEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+  });
+
+  test('uploads to raw-archive/ when raw-only is checked', async () => {
+    const { uploadData } = require('aws-amplify/storage');
+    uploadData.mockReturnValue({ result: Promise.resolve({ key: 'raw-archive/photo.jpg' }) });
+    renderHomePage();
+    fireEvent.click(screen.getByRole('checkbox', { name: /store as raw only/i }));
+    const input = document.querySelector('input[type="file"]');
+    fireEvent.change(input, { target: { files: [new File(['x'], 'photo.jpg', { type: 'image/jpeg' })] } });
+    fireEvent.click(screen.getByRole('button', { name: /upload to cloud/i }));
+    await waitFor(() => {
+      const call = uploadData.mock.calls[uploadData.mock.calls.length - 1][0];
+      expect(call.key).toMatch(/^raw-archive\//);
+    });
+  });
+
+  test('uploads to raw-photos/ for jpg when raw-only is unchecked', async () => {
+    const { uploadData } = require('aws-amplify/storage');
+    uploadData.mockReturnValue({ result: Promise.resolve({ key: 'raw-photos/photo.jpg' }) });
+    renderHomePage();
+    const input = document.querySelector('input[type="file"]');
+    fireEvent.change(input, { target: { files: [new File(['x'], 'photo.jpg', { type: 'image/jpeg' })] } });
+    fireEvent.click(screen.getByRole('button', { name: /upload to cloud/i }));
+    await waitFor(() => {
+      const call = uploadData.mock.calls[uploadData.mock.calls.length - 1][0];
+      expect(call.key).toMatch(/^raw-photos\//);
+    });
+  });
+
   test('does NOT show photo gallery on home page', () => {
     renderHomePage();
     expect(screen.queryByText(/photo gallery/i)).not.toBeInTheDocument();
